@@ -12,4 +12,4 @@ Contains the results and formulation of all models employed as part of task 1 an
 - neuralnet
 - nnet
 - corrr
--gmb
+- gmb
