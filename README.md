@@ -13,3 +13,6 @@ Contains the results and formulation of all models employed as part of task 1 an
 - nnet
 - corrr
 - gmb
+
+Branch 'Task 1' contains the .Rmd file to generate the results for task 1. Branch 'Task 2' contains the .Rmd file to generate the results for task 2.
+
