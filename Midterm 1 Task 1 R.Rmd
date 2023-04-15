@@ -1,0 +1,116 @@
+---
+title: "BIOSTAT 626 Midterm 1 Task 1"
+author: "Shreya Mittal"
+date: '2023-04-15'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Install needed packages
+```{r}
+library(dplyr)
+ #lasso
+library(glmnet)
+#random forest
+library(randomForest)
+library(datasets)
+library(caret)
+#SVM
+library(caTools)
+library(e1071)
+#MLP
+library(neuralnet)
+library(nnet)
+#pca
+library(corrr)
+library(gbm)
+```
+
+#1. Build a binary classifier to classify the activity of each time window into static (0) and dynamic (1).
+Read both training and testing dataset
+```{r}
+training=read.table('/Users/shreya/Downloads/training_data.txt', header = T)
+#dynamic is 1, static (including postural positions ) are 0 
+training=training %>% mutate(dynamic_flag=case_when(activity %in% c(1,2,3) ~1, TRUE~0))
+training$dynamic_flag=as.factor(training$dynamic_flag) #convert to a factor
+training$activity=NULL #remove activity to ensure no leekage
+test_r=read.table('/Users/shreya/Downloads/test_data.txt', header = T) #testing data
+```
+
+#EDA
+Check for class imbalance: Looks like a fairly equally distributed factors. No need to consider balancing classes.
+```{r}
+training %>% group_by(dynamic_flag) %>% summarize(n=n())
+```
+
+
+#Variable Selection
+Given 563 columns, it doesn't make sense both computationally and theoretically to train a model with 563 columns (total columns in the dataset). Therefore, we need to find a subset of variables which will be most useful. Lasso is one such implementation:
+##Data Prep
+```{r}
+x_train = model.matrix(dynamic_flag~.,training)
+y_train = ifelse(training$dynamic_flag=='1',1,0)
+```
+
+##LASSO outputted variables
+```{r}
+set.seed(1)
+#perform grid search to find optimal value of lambda
+#family= binomial => logistic regression, alpha=1 => lasso
+cv.out <- cv.glmnet(x_train,y_train,alpha=1,family="binomial",type.measure = "mse" )
+plot(cv.out) # Draw plot of training MSE as a function of lambda. 
+#regression coefficients using best value of lambda
+lasso_non_zero_coefs=coef(cv.out,s=cv.out$lambda.1se)
+#All the coefficient with a non-zero coefficient
+summ_b <- summary(lasso_non_zero_coefs)
+df_b=data.frame(Variable = rownames(lasso_non_zero_coefs)[summ_b$i],
+           Lasso_Coef= summ_b$x)
+df_b=df_b%>%filter(Lasso_Coef!=0)
+x=noquote(unlist(df_b$Variable))
+#Add all the non zero variables from lasso to form the regression formula
+paste(sprintf("%s", x), collapse="+")
+```
+
+#SVM
+##Tune using cross validation
+```{r}
+# initial settings
+kernels <- c('radial')
+cost0=10^(seq(3, 6, 0.5))
+gamma0=10^(seq(-7, -4, 0.5))
+degree0 <- c(1, 2, 3, 4)
+# reproducibility
+set.seed(0)
+# tuning the radial kernel SVM
+tune_result = tune(svm, dynamic_flag~subject+F40+F44+F45+F46+F53+F58+F63+F64+F69+F82+F83+F88+F94+F100+F101+F103+F105+F109+F149+F160+F182+F189+F205+F248+F272+F275+F297+F300+F317+F324+F355+F357+F358+F367+F370+F373+F380+F396+F410+F512+F515+F528, data = training, kernel = kernels,scale = FALSE, range = list(cost = cost0, gamma = gamma0),tunecontrol = tune.control(cross = 5))
+```
+
+## Train the model
+```{r}
+# hyper parameters for the best model
+hyper = tune_result$best.parameters
+# radial kernel SVM with the hyper parameters and probabilities
+best.models <- svm(dynamic_flag~F7+F44+F45+F46+F51+F53+F64+F83+F100+F101+F103+F105+F107+F109+F149+F158+F160+F180+F182+F189+F205+F218+F231+F244+F248+F269+F272+F275+F279+F294+F297+F317+F324+F357+F358+F367+F370+F373+F376+F378+F380+F396+F410+F512+F515+F528, data = training, probability = TRUE, kernel = kernels, scale = FALSE, cost = hyper[,1], gamma = hyper[,2])
+```
+
+## Prediction on Training Data
+```{r}
+pred = predict(best.models, training %>% select(-c(dynamic_flag)))
+## confusion matrix
+confusion = table(predict = pred, truth = training$dynamic_flag)
+confusion
+```
+
+## Prediction on Testing Data
+```{r}
+pred_real = predict(best.models, test_r)
+```
+
+### Write to a text file
+```{r}
+write.table(pred_real,'/Users/shreya/Desktop/BIOSTAT 626 MIDTERM I/RUN2/binary_shre.txt', row.names = F, col.names=F,quote = F)
+```
+
