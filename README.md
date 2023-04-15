@@ -14,5 +14,5 @@ Contains the results and formulation of all models employed as part of task 1 an
 - corrr
 - gmb
 
-Branch 'Task 1' contains the .Rmd file to generate the results for task 1. Branch 'Task 2' contains the .Rmd file to generate the results for task 2.
+Midterm 1 Task 1 R.Rmd generates the final results for task 1. Midterm 1 Task 2 R.Rmd generate the final results for task 2.
 
